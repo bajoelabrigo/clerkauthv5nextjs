@@ -1,25 +1,33 @@
-import mongoose from "mongoose";
+import mongoose, { Mongoose } from "mongoose";
 
-let isConnected: boolean = false;
+const MONGODB_URL = process.env.MONGODB_URL!;
 
-export const connectToDatabase = async () => {
-  mongoose.set("strictQuery", true);
+interface MongooseConn {
+  conn: Mongoose | null;
+  promise: Promise<Mongoose> | null;
+}
 
-  if (!process.env.MONGODB_URL) {
-    return console.log("MISSING MOGODB_URL");
-  }
+let cached: MongooseConn = (global as any).mongoose;
 
-  if (isConnected) {
-    return console.log("MongoDb is already connected");
-  }
+if (!cached) {
+  cached = (global as any).mongoose = {
+    conn: null,
+    promise: null,
+  };
+}
 
-  try {
-    await mongoose.connect(process.env.MONGODB_URL, {
+export const connect = async () => {
+  if (cached.conn) return cached.conn;
+
+  cached.promise =
+    cached.promise ||
+    mongoose.connect(MONGODB_URL, {
       dbName: "clerkauthv5",
+      bufferCommands: false,
+      connectTimeoutMS: 30000,
     });
-    isConnected = true;
-    console.log("MongoDB is connected");
-  } catch (error) {
-    console.log("MongoDB connection failed", error);
-  }
+
+  cached.conn = await cached.promise;
+
+  return cached.conn;
 };
